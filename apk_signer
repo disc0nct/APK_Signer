@@ -1,0 +1,68 @@
+#!/bin/bash
+
+# Define text color variables
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+NC='\033[0m' # No Color
+
+#ROOT PRIVILEGIES
+if [[ $EUID -ne 0 ]]; then
+    echo -e "$red You don't have Root privilegies, execute the script as root.$nc"
+    exit 1
+fi
+
+#Menu
+    echo -e "              \e[1;31m -- APK Signer -- \e[0m         "
+    echo ""
+    echo -e "            \e[0;34m Version : 1.0 \e[0m         "
+    echo -e "            \e[0;34m Coded by : @Disc0nct \e[0m         "
+    echo -e "            \e[0;34m Email   : montasilinigamer@gmail.com \e[0m         "
+    echo ""
+
+echo
+echo "APK Signer Script v1.0"
+echo "Description - This script helps you sign and generate a signed APK file from an existing APK using a keystore."
+echo
+# Ask for the APK file path
+read -p "$(echo -e ${YELLOW}"Enter the path to the APK file: "${NC})" apk_path
+
+# Check if the APK file exists
+if [ ! -f "$apk_path" ]; then
+  echo -e "${RED}APK file not found: $apk_path${NC}"
+  exit 1
+fi
+
+# Ask for the keystore password
+read -s -p "$(echo -e ${YELLOW}"Enter the keystore password: "${NC})" keystore_password
+echo
+
+# Ask for the key alias
+read -p "$(echo -e ${YELLOW}"Enter the key alias: "${NC})" key_alias
+
+# Ask for the name of the generated APK file
+read -p "$(echo -e ${YELLOW}"Enter the name of the generated APK file (without the .apk extension): "${NC})" output_name
+
+# Check if the output name is provided, default to "output" if not
+if [ -z "$output_name" ]; then
+  output_name="output"
+fi
+
+# Generate a keystore using keytool if it doesn't exist
+keystore_file="key.keystore"
+if [ ! -f "$keystore_file" ]; then
+  echo -e "${GREEN}Creating a new keystore...${NC}"
+  keytool -genkeypair -V -keystore "$keystore_file" -keyalg RSA -keysize 2048 -validity 10000 -storepass "$keystore_password" -keypass "$keystore_password" -alias "$key_alias"
+fi
+
+# Generate the signed APK
+output_apk="$output_name.apk"
+echo -e "${GREEN}Signing & Verifying the APK ...OK.${NC}"
+sleep 1
+jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore "$keystore_file" -storepass "$keystore_password" -keypass "$keystore_password" "$apk_path" "$key_alias" >/dev/null 2>&1
+jarsigner -verify -verbose -certs "$apk_path" >/dev/null 2>&1
+sleep 1
+echo -e "${GREEN}Generating the APK ...OK.${NC}"
+zipalign -v 4 "$apk_path" "$output_apk" >/dev/null 2>&1
+sleep 0.5
+echo -e "${GREEN}APK generated as${NC} $output_apk"
