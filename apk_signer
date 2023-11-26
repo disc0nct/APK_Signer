@@ -11,19 +11,64 @@ if [[ $EUID -ne 0 ]]; then
     echo -e "$red You don't have Root privilegies, execute the script as root.$nc"
     exit 1
 fi
-
-#Menu
+banner () {
+#Banner
     echo -e "              \e[1;31m -- APK Signer -- \e[0m         "
     echo ""
     echo -e "            \e[0;34m Version : 1.0 \e[0m         "
     echo -e "            \e[0;34m Coded by : @Disc0nct \e[0m         "
     echo -e "            \e[0;34m Email   : montasilinigamer@gmail.com \e[0m         "
     echo ""
-
-echo
+    echo
 echo "APK Signer Script v1.0"
 echo "Description - This script helps you sign and generate a signed APK file from an existing APK using a keystore."
 echo
+}
+banner
+# Check if the required tools are installed
+install_missing_tools=()
+
+check_and_install() {
+  local tool_name=$1
+  local tool_command=$2
+  local package_name=$3
+
+  if ! command -v $tool_command &> /dev/null; then
+    echo -e "${GREEN}${tool_name}${YELLOW} --- is not installed!${NC}"
+    sleep 0.5
+    install_missing_tools+=("$package_name")
+  else
+    echo -e "${YELLOW}${tool_name}${GREEN} +++ is installed!${NC}"
+    sleep 0.5
+  fi
+}
+
+echo -e "${YELLOW}Checking for required tools...${NC}"
+echo    "" 
+sleep 0.5
+
+check_and_install "Jarsigner" "jarsigner" "openjdk-11-jdk"
+check_and_install "Keytool" "keytool" "default-jdk"
+check_and_install "Zipalign" "zipalign" "zipalign"
+
+if [ ${#install_missing_tools[@]} -gt 0 ]; then
+  echo -e "Installing missing tools..."
+  sudo apt-get install -y "${install_missing_tools[@]}"  # Adjust this line based on your package manager (e.g., apt-get, yum, etc.)
+
+  if [ $? -eq 0 ]; then
+    echo -e "${YELLOW}Installation of missing tools successful!${NC}"
+  else
+    echo -e "${RED}Installation of missing tools failed!${NC}"
+    exit 1
+  fi
+else
+  echo -e "${YELLOW}All required tools are already installed!${NC}"
+fi
+
+echo -e "${YELLOW}DONE!!!${NC}"
+sleep 1 
+clear
+banner
 # Ask for the APK file path
 read -p "$(echo -e ${YELLOW}"Enter the path to the APK file: "${NC})" apk_path
 
@@ -52,17 +97,25 @@ fi
 keystore_file="key.keystore"
 if [ ! -f "$keystore_file" ]; then
   echo -e "${GREEN}Creating a new keystore...${NC}"
-  keytool -genkeypair -V -keystore "$keystore_file" -keyalg RSA -keysize 2048 -validity 10000 -storepass "$keystore_password" -keypass "$keystore_password" -alias "$key_alias"
+  keytool -genkeypair -V -keystore "$keystore_file" -keyalg RSA -keysize 2048 -validity 100000 -storepass "$keystore_password" -keypass "$keystore_password" -alias "$key_alias"
 fi
 
 # Generate the signed APK
 output_apk="$output_name.apk"
-echo -e "${GREEN}Signing & Verifying the APK ...OK.${NC}"
+echo -e "${GREEN}Signing & Verifying the APK ...${NC}"
 sleep 1
-jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore "$keystore_file" -storepass "$keystore_password" -keypass "$keystore_password" "$apk_path" "$key_alias" >/dev/null 2>&1
-jarsigner -verify -verbose -certs "$apk_path" >/dev/null 2>&1
+jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA256 -keystore "$keystore_file" -storepass "$keystore_password" -keypass "$keystore_password" "$apk_path" "$key_alias" >/dev/null 2>&1
+jarsigner -verify -verbose -certs "$apk_path" #>/dev/null 2>&1
 sleep 1
-echo -e "${GREEN}Generating the APK ...OK.${NC}"
-zipalign -v 4 "$apk_path" "$output_apk" >/dev/null 2>&1
+echo "OK."
+echo -e "${GREEN}Generating the APK ...${NC}"
+zipalign -v 4 "$apk_path" "$output_apk" #>/dev/null 2>&1
 sleep 0.5
-echo -e "${GREEN}APK generated as${NC} $output_apk"
+if [ ! -f "$$output_apk" ]; then 
+  echo -e "${RED}Failed to generate the apk!${NC}"
+  rm key.keystore
+else 
+  echo -e "${GREEN}APK generated as${NC} $output_apk"
+  echo "OK."
+  rm key.keystore
+fi
